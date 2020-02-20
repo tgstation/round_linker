@@ -42,14 +42,18 @@ async function getIssueBody(client, issue_number) {
 
 // Would be less intrusive but more spammy with a comment, undecided.
 async function createLinks(client, issue_number, issue_body) {
-  const new_body = issue_body.replace(/(\[Round ID\]: )(\d+)/g, "$1[$2](https://scrubby.melonmesa.com/round/$2)");
+  let re = /(\[Round ID\]: )(\d+)/g
+  if(issue_body.match(re))
+  {
+    const new_body = issue_body.replace(re, "$1[$2](https://scrubby.melonmesa.com/round/$2)");
 
-  const getResponse = await client.issues.update({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    issue_number: issue_number,
-    body: new_body
-  });
+    const getResponse = await client.issues.update({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issue_number,
+      body: new_body
+    });
+  }
 }
 
 run();
