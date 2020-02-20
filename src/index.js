@@ -37,7 +37,7 @@ async function getIssueBody(client, issue_number) {
     repo: github.context.repo.repo,
     issue_number: issue_number
   });
-  return getResponse.body
+  return getResponse.data.body
 }
 
 // Would be less intrusive but more spammy with a comment, undecided.
