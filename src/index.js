@@ -4,12 +4,12 @@ const github = require('@actions/github');
 async function run() {
   try {
     const token = core.getInput("repo-token", { required: true });
-    const client = new github.GitHub(token);
     const issue_number = getIssueNumber();
     if (!issue_number) {
       core.setFailed("Issue number retrieval failed");
       return;
     }
+    const client = new github.GitHub(token);
     const issue_body = await getIssueBody(client, issue_number)
     if (!issue_body) {
       core.setFailed("Issue body retrieval failed");

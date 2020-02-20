@@ -21738,24 +21738,23 @@ function sync (path, options) {
 const core = __webpack_require__(853);
 const github = __webpack_require__(82);
 
-async function run(){
+async function run() {
   try {
     const token = core.getInput("repo-token", { required: true });
-    const client = new github.GitHub(token);
     const issue_number = getIssueNumber();
-    if(!issue_number){
+    if (!issue_number) {
       core.setFailed("Issue number retrieval failed");
       return;
     }
-    const issue_body = await getIssueBody(client,issue_number)
-    if(!issue_body)
-    {
+    const client = new github.GitHub(token);
+    const issue_body = await getIssueBody(client, issue_number)
+    if (!issue_body) {
       core.setFailed("Issue body retrieval failed");
       return;
     }
-    createLinks(client,issue_number,issue_body)
+    createLinks(client, issue_number, issue_body)
   }
-  catch(e){
+  catch (e) {
     core.setFailed("Action failed.");
   }
 
@@ -21769,19 +21768,19 @@ function getIssueNumber() {
   return issue.number;
 }
 
-async function getIssueBody(client,issue_number) {
+async function getIssueBody(client, issue_number) {
   const getResponse = await client.issues.get({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
     issue_number: issue_number
   });
-  return getResponse.body
+  return getResponse.data.body
 }
 
 // Would be less intrusive but more spammy with a comment, undecided.
-async function createLinks(client,issue_number,issue_body) {
-  const new_body = issue_body.replace(/(\[Round ID\]: )(\d+)/g,"$1[$2](https://scrubby.melonmesa.com/round/$2)");
- 
+async function createLinks(client, issue_number, issue_body) {
+  const new_body = issue_body.replace(/(\[Round ID\]: )(\d+)/g, "$1[$2](https://scrubby.melonmesa.com/round/$2)");
+
   const getResponse = await client.issues.update({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
