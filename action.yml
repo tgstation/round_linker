@@ -1,0 +1,8 @@
+name: 'Round ID Linker'
+description: 'Links Round IDs found in issue body'
+inputs: 
+  repo-token:
+    description: 'The GITHUB_TOKEN secret'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
