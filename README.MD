@@ -22,7 +22,7 @@ jobs:
   link_rounds:
     runs-on: ubuntu-latest
     steps:
-    - uses: AnturK/round_linker@master
+    - uses: tgstation/round_linker@master
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 ```
