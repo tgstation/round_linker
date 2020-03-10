@@ -42,7 +42,7 @@ async function getIssueBody(client, issue_number) {
 
 // Would be less intrusive but more spammy with a comment, undecided.
 async function createLinks(client, issue_number, issue_body) {
-  let re = /(\[Round ID\]: )(\d+)/g
+  let re = /(\[?Round ID\]?:\s*)(\d+)/g
   if(issue_body.match(re))
   {
     const new_body = issue_body.replace(re, "$1[$2](https://scrubby.melonmesa.com/round/$2)");
