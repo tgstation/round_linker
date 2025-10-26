@@ -1,6 +1,6 @@
 # Round ID Linker
 
-Replaces round id's in issue body with links to scrubby.
+Replaces round id's in issue body with links to statbus.
 Accepted round id format :
 ```
 [Round ID]: 1245
