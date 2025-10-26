@@ -45,7 +45,7 @@ async function createLinks(client, issue_number, issue_body) {
   let re = /(\[?Round ID\]?:\s*)(\d+)/g
   if(issue_body.match(re))
   {
-    const new_body = issue_body.replace(re, "$1[$2](https://scrubby.melonmesa.com/round/$2)");
+    const new_body = issue_body.replace(re, "$1[$2](https://statbus.space/round/$2)");
 
     const getResponse = await client.issues.update({
       owner: github.context.repo.owner,
