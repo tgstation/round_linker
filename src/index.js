@@ -14,12 +14,12 @@ async function run() {
     const octokit = new getOctokit(getInput("repo-token", { required: true }));
 
     //get issue body
-    const data = await octokit.rest.issues.get({
+    const response = await octokit.rest.issues.get({
       owner: context.repo.owner,
       repo: context.repo.repo,
       issue_number: issue_number,
     });
-    const issue_body = data.body;
+    const issue_body = response.data.body;
     if (!issue_body) {
       setFailed("Issue body retrieval failed");
       return;
