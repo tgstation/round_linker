@@ -41,7 +41,7 @@ async function run() {
       });
     }
   } catch (e) {
-    setFailed("Action failed.");
+    setFailed(`Action failed ${e}.`);
   }
 }
 
