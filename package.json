@@ -4,14 +4,24 @@
   "private": true,
   "description": "",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
-    "build" : "ncc build .\\src\\index.js"
+    "format": "prettier --write **/*.js",
+    "format-check": "prettier --check **/*.js",
+    "package": "rollup -c",
+    "all": "npm run format && npm run format-check && npm run package"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@actions/core": "^1.9.1",
-    "@actions/github": "^9.1.0"
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^25.6.0",
+    "prettier": "^3.8.3"
   }
 }
