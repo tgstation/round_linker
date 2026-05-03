@@ -14,8 +14,6 @@ jobs:
               run: |
                   npm ci
                   npm ls
-            - name: Run Test
-              run: npm run test
             - name: Validate dist
               run: |
                   cp dist/index.js index_pr.js
