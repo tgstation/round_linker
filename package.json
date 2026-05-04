@@ -4,6 +4,7 @@
   "private": true,
   "description": "",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "format": "prettier --write **/*.js",
     "format-check": "prettier --check **/*.js",
