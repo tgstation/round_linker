@@ -47,7 +47,7 @@ async function run(): Promise<void> {
         }
     } catch (e) {
         setFailed(`Action failed ${e}.`)
-    }
+ }
 }
 
 run()
