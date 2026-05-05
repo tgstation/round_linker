@@ -6,8 +6,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "format": "prettier --write **/*.js",
-    "format-check": "prettier --check **/*.js",
+    "format": "prettier --write **/*.ts",
+    "format-check": "prettier --check **/*.ts",
     "lint": "eslint",
     "build": "tsc",
     "package": "rollup -c",

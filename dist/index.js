@@ -29009,7 +29009,7 @@ function requireLib () {
 
 var libExports = requireLib();
 
-var __awaiter$1 = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -29037,7 +29037,7 @@ function getProxyAgentDispatcher(destinationUrl) {
 }
 function getProxyFetch(destinationUrl) {
     const httpDispatcher = getProxyAgentDispatcher(destinationUrl);
-    const proxyFetch = (url, opts) => __awaiter$1(this, void 0, void 0, function* () {
+    const proxyFetch = (url, opts) => __awaiter(this, void 0, void 0, function* () {
         return undiciExports.fetch(url, Object.assign(Object.assign({}, opts), { dispatcher: httpDispatcher }));
     });
     return proxyFetch;
@@ -33056,56 +33056,44 @@ function getOctokit(token, options, ...additionalPlugins) {
     return new GitHubWithPlugins(getOctokitOptions(token));
 }
 
-var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-function run() {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        try {
-            // Get issue number of the payload
-            const issue_number = (_a = context.payload.issue) === null || _a === void 0 ? void 0 : _a.number;
-            if (!issue_number) {
-                setFailed("Issue number retrieval failed");
-                return;
-            }
-            //github client to make requests
-            const octokit = getOctokit(getInput("repo-token", { required: true }));
-            //get issue body
-            const response = yield octokit.rest.issues.get({
+async function run() {
+    try {
+        // Get issue number of the payload
+        const issue_number = context.payload.issue?.number;
+        if (!issue_number) {
+            setFailed("Issue number retrieval failed");
+            return;
+        }
+        //github client to make requests
+        const octokit = getOctokit(getInput("repo-token", { required: true }));
+        //get issue body
+        const response = await octokit.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue_number,
+        });
+        const issue_body = response.data.body;
+        if (!issue_body) {
+            setFailed("Issue body retrieval failed");
+            return;
+        }
+        //modify issue body with round link id
+        const re = /(\[?Round ID\]?:\s*)(\d+)/g;
+        if (issue_body.match(re)) {
+            const new_body = issue_body.replace(re, "$1[$2](https://statbus.space/round/$2)");
+            await octokit.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue_number,
+                body: new_body,
+                headers: {
+                    "X-GitHub-Api-Version": "2026-03-10",
+                },
             });
-            const issue_body = response.data.body;
-            if (!issue_body) {
-                setFailed("Issue body retrieval failed");
-                return;
-            }
-            //modify issue body with round link id
-            const re = /(\[?Round ID\]?:\s*)(\d+)/g;
-            if (issue_body.match(re)) {
-                const new_body = issue_body.replace(re, "$1[$2](https://statbus.space/round/$2)");
-                yield octokit.rest.issues.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issue_number,
-                    body: new_body,
-                    headers: {
-                        "X-GitHub-Api-Version": "2026-03-10"
-                    }
-                });
-            }
         }
-        catch (e) {
-            setFailed(`Action failed ${e}.`);
-        }
-    });
+    }
+    catch (e) {
+        setFailed(`Action failed ${e}.`);
+    }
 }
 run();

@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
         "rootDir": "./src",
-        "target": "es2015" /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */,
-        "module": "es2015" /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */,
+        "target": "es2025" /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019', 'ES2020', or 'ESNEXT'. */,
+        "module": "es2022" /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', 'es2020', or 'ESNext'. */,
         "outDir": "./out" /* Redirect output structure to the directory. */,
         "strict": true /* Enable all strict type-checking options. */,
         "noImplicitAny": true /* Raise error on expressions and declarations with an implied 'any' type. */,
