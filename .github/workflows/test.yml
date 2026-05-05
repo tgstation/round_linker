@@ -28,6 +28,6 @@ jobs:
                   npm run build
                   npm run package
                   echo "Files should not differ but even if they do"
-                  echo "It's a non blocking issue as files made in windows still work on ubunto github action runner"
-                  echo "This just checks for basic consistency"
+                  echo "It's a non blocking issue as files made in windows still work on ubuntu github action runner"
+                  echo "This just checks for basic consistency which is good but not always nessassary"
                   diff dist/index.js index_pr.js || true
