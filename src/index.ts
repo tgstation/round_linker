@@ -1,29 +1,29 @@
-import * as core from "@actions/core"
-import * as github from "@actions/github"
+import { getInput, setFailed } from "@actions/core"
+import { getOctokit, context } from "@actions/github"
 
 async function run(): Promise<void> {
     try {
         // Get issue number of the payload
-        const issue_number = github.context.payload.issue?.number
+        const issue_number = context.payload.issue?.number
         if (!issue_number) {
-            core.setFailed("Issue number retrieval failed")
+            setFailed("Issue number retrieval failed")
             return
         }
 
         //github client to make requests
-        const octokit: ReturnType<typeof github.getOctokit> = github.getOctokit(
-            core.getInput("repo-token", { required: true }),
+        const octokit: ReturnType<typeof getOctokit> = getOctokit(
+            getInput("repo-token", { required: true }),
         )
 
         //get issue body
         const response = await octokit.rest.issues.get({
-            owner: github.context.repo.owner,
-            repo: github.context.repo.repo,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
             issue_number: issue_number,
         })
         const issue_body = response.data.body
         if (!issue_body) {
-            core.setFailed("Issue body retrieval failed")
+            setFailed("Issue body retrieval failed")
             return
         }
 
@@ -36,8 +36,8 @@ async function run(): Promise<void> {
             )
 
             await octokit.rest.issues.update({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 issue_number: issue_number,
                 body: new_body,
                 headers: {
@@ -46,7 +46,7 @@ async function run(): Promise<void> {
             })
         }
     } catch (e) {
-        core.setFailed(`Action failed ${e}.`)
+        setFailed(`Action failed ${e}.`)
     }
 }
 
