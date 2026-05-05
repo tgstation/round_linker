@@ -8,8 +8,10 @@
   "scripts": {
     "format": "prettier --write **/*.js",
     "format-check": "prettier --check **/*.js",
+    "lint": "eslint",
+    "build": "tsc",
     "package": "rollup -c",
-    "all": "npm run format && npm run format-check && npm run package"
+    "all": "npm run format && npm run format-check && npm run lint && npm run build && npm run package"
   },
   "keywords": [],
   "author": "",
@@ -19,9 +21,17 @@
     "@actions/github": "^9.1.1"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
     "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^25.6.0",
-    "prettier": "^3.8.3"
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
   }
 }

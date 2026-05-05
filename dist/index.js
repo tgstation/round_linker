@@ -33030,7 +33030,7 @@ const GitHub = Octokit.plugin(restEndpointMethods, paginateRest).defaults(defaul
  * @param     options  other options to set
  */
 function getOctokitOptions(token, options) {
-    const opts = Object.assign({}, options || {}); // Shallow clone - don't mutate the object provided by the caller
+    const opts = Object.assign({}, {}); // Shallow clone - don't mutate the object provided by the caller
     // Auth
     const auth = getAuthString(token, opts);
     if (auth) {
@@ -33053,51 +33053,44 @@ const context = new Context();
  */
 function getOctokit(token, options, ...additionalPlugins) {
     const GitHubWithPlugins = GitHub.plugin(...additionalPlugins);
-    return new GitHubWithPlugins(getOctokitOptions(token, options));
+    return new GitHubWithPlugins(getOctokitOptions(token));
 }
 
 async function run() {
-  try {
-    // Get issue number of the payload
-    const issue_number = context.payload.issue?.number;
-    if (!issue_number) {
-      setFailed("Issue number retrieval failed");
-      return;
+    try {
+        // Get issue number of the payload
+        const issue_number = context.payload.issue?.number;
+        if (!issue_number) {
+            setFailed("Issue number retrieval failed");
+            return;
+        }
+        //github client to make requests
+        const octokit = getOctokit(getInput("repo-token", { required: true }));
+        //get issue body
+        const response = await octokit.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue_number,
+        });
+        const issue_body = response.data.body;
+        if (!issue_body) {
+            setFailed("Issue body retrieval failed");
+            return;
+        }
+        //modify issue body with round link id
+        const re = /(\[?Round ID\]?:\s*)(\d+)/g;
+        if (issue_body.match(re)) {
+            const new_body = issue_body.replace(re, "$1[$2](https://statbus.space/round/$2)");
+            await octokit.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                body: new_body,
+            });
+        }
     }
-
-    //github client to make requests
-    const octokit = new getOctokit(getInput("repo-token", { required: true }));
-
-    //get issue body
-    const response = await octokit.rest.issues.get({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      issue_number: issue_number,
-    });
-    const issue_body = response.data.body;
-    if (!issue_body) {
-      setFailed("Issue body retrieval failed");
-      return;
+    catch (e) {
+        setFailed(`Action failed ${e}.`);
     }
-
-    //modify issue body with round link id
-    const re = /(\[?Round ID\]?:\s*)(\d+)/g;
-    if (issue_body.match(re)) {
-      const new_body = issue_body.replace(
-        re,
-        "$1[$2](https://statbus.space/round/$2)",
-      );
-
-      await octokit.rest.issues.update({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: issue_number,
-        body: new_body,
-      });
-    }
-  } catch (e) {
-    setFailed(`Action failed ${e}.`);
-  }
 }
-
 run();
