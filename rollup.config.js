@@ -7,5 +7,6 @@ export default {
     file: "dist/index.js",
     format: "es",
   },
+  context: 'globalThis',
   plugins: [commonjs(), nodeResolve()],
 };
