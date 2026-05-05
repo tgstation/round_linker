@@ -1,15 +1,19 @@
-import { existsSync, readFileSync } from 'fs';
-import { EOL } from 'os';
-import require$$2 from 'http';
-import require$$3 from 'https';
+import * as os from 'os';
+import os__default, { EOL } from 'os';
+import 'crypto';
+import * as fs from 'fs';
+import { promises, existsSync, readFileSync } from 'fs';
+import 'path';
+import http from 'http';
+import https from 'https';
 import 'net';
 import require$$1 from 'tls';
-import require$$4 from 'events';
+import events$1 from 'events';
 import 'assert';
 import require$$6 from 'util';
 import require$$0$1 from 'node:assert';
 import require$$0$3 from 'node:net';
-import require$$2$1 from 'node:http';
+import require$$2 from 'node:http';
 import require$$0$2 from 'node:stream';
 import require$$0 from 'node:buffer';
 import require$$0$4 from 'node:util';
@@ -26,163 +30,131 @@ import require$$5$2 from 'node:async_hooks';
 import require$$1$4 from 'node:console';
 import require$$1$5 from 'node:dns';
 import require$$5$3 from 'string_decoder';
+import 'child_process';
+import 'timers';
 
-class Context {
-    /**
-     * Hydrate the context from the environment
-     */
-    constructor() {
-        var _a, _b, _c;
-        this.payload = {};
-        if (process.env.GITHUB_EVENT_PATH) {
-            if (existsSync(process.env.GITHUB_EVENT_PATH)) {
-                this.payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, { encoding: 'utf8' }));
+// We use any as a valid input type
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Sanitizes an input into a string so it can be passed into issueCommand safely
+ * @param input input to sanitize into a string
+ */
+function toCommandValue(input) {
+    if (input === null || input === undefined) {
+        return '';
+    }
+    else if (typeof input === 'string' || input instanceof String) {
+        return input;
+    }
+    return JSON.stringify(input);
+}
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        file: annotationProperties.file,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+
+/**
+ * Issues a command to the GitHub Actions runner
+ *
+ * @param command - The command name to issue
+ * @param properties - Additional properties for the command (key-value pairs)
+ * @param message - The message to include with the command
+ * @remarks
+ * This function outputs a specially formatted string to stdout that the Actions
+ * runner interprets as a command. These commands can control workflow behavior,
+ * set outputs, create annotations, mask values, and more.
+ *
+ * Command Format:
+ *   ::name key=value,key=value::message
+ *
+ * @example
+ * ```typescript
+ * // Issue a warning annotation
+ * issueCommand('warning', {}, 'This is a warning message');
+ * // Output: ::warning::This is a warning message
+ *
+ * // Set an environment variable
+ * issueCommand('set-env', { name: 'MY_VAR' }, 'some value');
+ * // Output: ::set-env name=MY_VAR::some value
+ *
+ * // Add a secret mask
+ * issueCommand('add-mask', {}, 'secretValue123');
+ * // Output: ::add-mask::secretValue123
+ * ```
+ *
+ * @internal
+ * This is an internal utility function that powers the public API functions
+ * such as setSecret, warning, error, and exportVariable.
+ */
+function issueCommand(command, properties, message) {
+    const cmd = new Command(command, properties, message);
+    process.stdout.write(cmd.toString() + os.EOL);
+}
+const CMD_STRING = '::';
+class Command {
+    constructor(command, properties, message) {
+        if (!command) {
+            command = 'missing.command';
+        }
+        this.command = command;
+        this.properties = properties;
+        this.message = message;
+    }
+    toString() {
+        let cmdStr = CMD_STRING + this.command;
+        if (this.properties && Object.keys(this.properties).length > 0) {
+            cmdStr += ' ';
+            let first = true;
+            for (const key in this.properties) {
+                if (this.properties.hasOwnProperty(key)) {
+                    const val = this.properties[key];
+                    if (val) {
+                        if (first) {
+                            first = false;
+                        }
+                        else {
+                            cmdStr += ',';
+                        }
+                        cmdStr += `${key}=${escapeProperty(val)}`;
+                    }
+                }
             }
-            else {
-                const path = process.env.GITHUB_EVENT_PATH;
-                process.stdout.write(`GITHUB_EVENT_PATH ${path} does not exist${EOL}`);
-            }
         }
-        this.eventName = process.env.GITHUB_EVENT_NAME;
-        this.sha = process.env.GITHUB_SHA;
-        this.ref = process.env.GITHUB_REF;
-        this.workflow = process.env.GITHUB_WORKFLOW;
-        this.action = process.env.GITHUB_ACTION;
-        this.actor = process.env.GITHUB_ACTOR;
-        this.job = process.env.GITHUB_JOB;
-        this.runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT, 10);
-        this.runNumber = parseInt(process.env.GITHUB_RUN_NUMBER, 10);
-        this.runId = parseInt(process.env.GITHUB_RUN_ID, 10);
-        this.apiUrl = (_a = process.env.GITHUB_API_URL) !== null && _a !== void 0 ? _a : `https://api.github.com`;
-        this.serverUrl = (_b = process.env.GITHUB_SERVER_URL) !== null && _b !== void 0 ? _b : `https://github.com`;
-        this.graphqlUrl =
-            (_c = process.env.GITHUB_GRAPHQL_URL) !== null && _c !== void 0 ? _c : `https://api.github.com/graphql`;
+        cmdStr += `${CMD_STRING}${escapeData(this.message)}`;
+        return cmdStr;
     }
-    get issue() {
-        const payload = this.payload;
-        return Object.assign(Object.assign({}, this.repo), { number: (payload.issue || payload.pull_request || payload).number });
-    }
-    get repo() {
-        if (process.env.GITHUB_REPOSITORY) {
-            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
-            return { owner, repo };
-        }
-        if (this.payload.repository) {
-            return {
-                owner: this.payload.repository.owner.login,
-                repo: this.payload.repository.name
-            };
-        }
-        throw new Error("context.repo requires a GITHUB_REPOSITORY environment variable like 'owner/repo'");
-    }
+}
+function escapeData(s) {
+    return toCommandValue(s)
+        .replace(/%/g, '%25')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A');
+}
+function escapeProperty(s) {
+    return toCommandValue(s)
+        .replace(/%/g, '%25')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A')
+        .replace(/:/g, '%3A')
+        .replace(/,/g, '%2C');
 }
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-var lib = {};
-
-var proxy = {};
-
-var hasRequiredProxy;
-
-function requireProxy () {
-	if (hasRequiredProxy) return proxy;
-	hasRequiredProxy = 1;
-	Object.defineProperty(proxy, "__esModule", { value: true });
-	proxy.getProxyUrl = getProxyUrl;
-	proxy.checkBypass = checkBypass;
-	function getProxyUrl(reqUrl) {
-	    const usingSsl = reqUrl.protocol === 'https:';
-	    if (checkBypass(reqUrl)) {
-	        return undefined;
-	    }
-	    const proxyVar = (() => {
-	        if (usingSsl) {
-	            return process.env['https_proxy'] || process.env['HTTPS_PROXY'];
-	        }
-	        else {
-	            return process.env['http_proxy'] || process.env['HTTP_PROXY'];
-	        }
-	    })();
-	    if (proxyVar) {
-	        try {
-	            return new DecodedURL(proxyVar);
-	        }
-	        catch (_a) {
-	            if (!proxyVar.startsWith('http://') && !proxyVar.startsWith('https://'))
-	                return new DecodedURL(`http://${proxyVar}`);
-	        }
-	    }
-	    else {
-	        return undefined;
-	    }
-	}
-	function checkBypass(reqUrl) {
-	    if (!reqUrl.hostname) {
-	        return false;
-	    }
-	    const reqHost = reqUrl.hostname;
-	    if (isLoopbackAddress(reqHost)) {
-	        return true;
-	    }
-	    const noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
-	    if (!noProxy) {
-	        return false;
-	    }
-	    // Determine the request port
-	    let reqPort;
-	    if (reqUrl.port) {
-	        reqPort = Number(reqUrl.port);
-	    }
-	    else if (reqUrl.protocol === 'http:') {
-	        reqPort = 80;
-	    }
-	    else if (reqUrl.protocol === 'https:') {
-	        reqPort = 443;
-	    }
-	    // Format the request hostname and hostname with port
-	    const upperReqHosts = [reqUrl.hostname.toUpperCase()];
-	    if (typeof reqPort === 'number') {
-	        upperReqHosts.push(`${upperReqHosts[0]}:${reqPort}`);
-	    }
-	    // Compare request host against noproxy
-	    for (const upperNoProxyItem of noProxy
-	        .split(',')
-	        .map(x => x.trim().toUpperCase())
-	        .filter(x => x)) {
-	        if (upperNoProxyItem === '*' ||
-	            upperReqHosts.some(x => x === upperNoProxyItem ||
-	                x.endsWith(`.${upperNoProxyItem}`) ||
-	                (upperNoProxyItem.startsWith('.') &&
-	                    x.endsWith(`${upperNoProxyItem}`)))) {
-	            return true;
-	        }
-	    }
-	    return false;
-	}
-	function isLoopbackAddress(host) {
-	    const hostLower = host.toLowerCase();
-	    return (hostLower === 'localhost' ||
-	        hostLower.startsWith('127.') ||
-	        hostLower.startsWith('[::1]') ||
-	        hostLower.startsWith('[0:0:0:0:0:0:0:1]'));
-	}
-	class DecodedURL extends URL {
-	    constructor(url, base) {
-	        super(url, base);
-	        this._decodedUsername = decodeURIComponent(super.username);
-	        this._decodedPassword = decodeURIComponent(super.password);
-	    }
-	    get username() {
-	        return this._decodedUsername;
-	    }
-	    get password() {
-	        return this._decodedPassword;
-	    }
-	}
-	
-	return proxy;
-}
 
 var tunnel$1 = {};
 
@@ -192,9 +164,9 @@ function requireTunnel$1 () {
 	if (hasRequiredTunnel$1) return tunnel$1;
 	hasRequiredTunnel$1 = 1;
 	var tls = require$$1;
-	var http = require$$2;
-	var https = require$$3;
-	var events = require$$4;
+	var http$1 = http;
+	var https$1 = https;
+	var events = events$1;
 	var util = require$$6;
 
 
@@ -206,13 +178,13 @@ function requireTunnel$1 () {
 
 	function httpOverHttp(options) {
 	  var agent = new TunnelingAgent(options);
-	  agent.request = http.request;
+	  agent.request = http$1.request;
 	  return agent;
 	}
 
 	function httpsOverHttp(options) {
 	  var agent = new TunnelingAgent(options);
-	  agent.request = http.request;
+	  agent.request = http$1.request;
 	  agent.createSocket = createSecureSocket;
 	  agent.defaultPort = 443;
 	  return agent;
@@ -220,13 +192,13 @@ function requireTunnel$1 () {
 
 	function httpOverHttps(options) {
 	  var agent = new TunnelingAgent(options);
-	  agent.request = https.request;
+	  agent.request = https$1.request;
 	  return agent;
 	}
 
 	function httpsOverHttps(options) {
 	  var agent = new TunnelingAgent(options);
-	  agent.request = https.request;
+	  agent.request = https$1.request;
 	  agent.createSocket = createSecureSocket;
 	  agent.defaultPort = 443;
 	  return agent;
@@ -237,7 +209,7 @@ function requireTunnel$1 () {
 	  var self = this;
 	  self.options = options || {};
 	  self.proxyOptions = self.options.proxy || {};
-	  self.maxSockets = self.options.maxSockets || http.Agent.defaultMaxSockets;
+	  self.maxSockets = self.options.maxSockets || http$1.Agent.defaultMaxSockets;
 	  self.requests = [];
 	  self.sockets = [];
 
@@ -463,6 +435,8 @@ function requireTunnel () {
 	tunnel = requireTunnel$1();
 	return tunnel;
 }
+
+requireTunnel();
 
 var undici = {};
 
@@ -1270,7 +1244,7 @@ function requireUtil$7 () {
 
 	const assert = require$$0$1;
 	const { kDestroyed, kBodyUsed, kListeners, kBody } = requireSymbols$4();
-	const { IncomingMessage } = require$$2$1;
+	const { IncomingMessage } = require$$2;
 	const stream = require$$0$2;
 	const net = require$$0$3;
 	const { Blob } = require$$0;
@@ -10994,7 +10968,7 @@ function requireClient () {
 
 	const assert = require$$0$1;
 	const net = require$$0$3;
-	const http = require$$2$1;
+	const http = require$$2;
 	const util = requireUtil$7();
 	const { channels } = requireDiagnostics();
 	const Request = requireRequest$1();
@@ -14927,7 +14901,7 @@ function requireMockUtils () {
 	  kGetNetConnect
 	} = requireMockSymbols();
 	const { buildURL } = requireUtil$7();
-	const { STATUS_CODES } = require$$2$1;
+	const { STATUS_CODES } = require$$2;
 	const {
 	  types: {
 	    isPromise
@@ -19035,7 +19009,7 @@ function requireFetch () {
 	const { dataURLProcessor, serializeAMimeType, minimizeSupportedMimeType } = requireDataUrl();
 	const { getGlobalDispatcher } = requireGlobal();
 	const { webidl } = requireWebidl();
-	const { STATUS_CODES } = require$$2$1;
+	const { STATUS_CODES } = require$$2;
 	const GET_OR_HEAD = ['GET', 'HEAD'];
 
 	const defaultUserAgent = typeof __UNDICI_IS_NODE__ !== 'undefined' || typeof esbuildDetection !== 'undefined'
@@ -27918,6 +27892,377 @@ function requireUndici () {
 	return undici;
 }
 
+var undiciExports = requireUndici();
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var HttpCodes;
+(function (HttpCodes) {
+    HttpCodes[HttpCodes["OK"] = 200] = "OK";
+    HttpCodes[HttpCodes["MultipleChoices"] = 300] = "MultipleChoices";
+    HttpCodes[HttpCodes["MovedPermanently"] = 301] = "MovedPermanently";
+    HttpCodes[HttpCodes["ResourceMoved"] = 302] = "ResourceMoved";
+    HttpCodes[HttpCodes["SeeOther"] = 303] = "SeeOther";
+    HttpCodes[HttpCodes["NotModified"] = 304] = "NotModified";
+    HttpCodes[HttpCodes["UseProxy"] = 305] = "UseProxy";
+    HttpCodes[HttpCodes["SwitchProxy"] = 306] = "SwitchProxy";
+    HttpCodes[HttpCodes["TemporaryRedirect"] = 307] = "TemporaryRedirect";
+    HttpCodes[HttpCodes["PermanentRedirect"] = 308] = "PermanentRedirect";
+    HttpCodes[HttpCodes["BadRequest"] = 400] = "BadRequest";
+    HttpCodes[HttpCodes["Unauthorized"] = 401] = "Unauthorized";
+    HttpCodes[HttpCodes["PaymentRequired"] = 402] = "PaymentRequired";
+    HttpCodes[HttpCodes["Forbidden"] = 403] = "Forbidden";
+    HttpCodes[HttpCodes["NotFound"] = 404] = "NotFound";
+    HttpCodes[HttpCodes["MethodNotAllowed"] = 405] = "MethodNotAllowed";
+    HttpCodes[HttpCodes["NotAcceptable"] = 406] = "NotAcceptable";
+    HttpCodes[HttpCodes["ProxyAuthenticationRequired"] = 407] = "ProxyAuthenticationRequired";
+    HttpCodes[HttpCodes["RequestTimeout"] = 408] = "RequestTimeout";
+    HttpCodes[HttpCodes["Conflict"] = 409] = "Conflict";
+    HttpCodes[HttpCodes["Gone"] = 410] = "Gone";
+    HttpCodes[HttpCodes["TooManyRequests"] = 429] = "TooManyRequests";
+    HttpCodes[HttpCodes["InternalServerError"] = 500] = "InternalServerError";
+    HttpCodes[HttpCodes["NotImplemented"] = 501] = "NotImplemented";
+    HttpCodes[HttpCodes["BadGateway"] = 502] = "BadGateway";
+    HttpCodes[HttpCodes["ServiceUnavailable"] = 503] = "ServiceUnavailable";
+    HttpCodes[HttpCodes["GatewayTimeout"] = 504] = "GatewayTimeout";
+})(HttpCodes || (HttpCodes = {}));
+var Headers;
+(function (Headers) {
+    Headers["Accept"] = "accept";
+    Headers["ContentType"] = "content-type";
+})(Headers || (Headers = {}));
+var MediaTypes;
+(function (MediaTypes) {
+    MediaTypes["ApplicationJson"] = "application/json";
+})(MediaTypes || (MediaTypes = {}));
+[
+    HttpCodes.MovedPermanently,
+    HttpCodes.ResourceMoved,
+    HttpCodes.SeeOther,
+    HttpCodes.TemporaryRedirect,
+    HttpCodes.PermanentRedirect
+];
+[
+    HttpCodes.BadGateway,
+    HttpCodes.ServiceUnavailable,
+    HttpCodes.GatewayTimeout
+];
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+const { access, appendFile, writeFile } = promises;
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs.promises;
+// export const {open} = 'fs'
+process.platform === 'win32';
+fs.constants.O_RDONLY;
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+/* eslint-disable @typescript-eslint/unbound-method */
+process.platform === 'win32';
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+os__default.platform();
+os__default.arch();
+
+(globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+/**
+ * The code to exit an action
+ */
+var ExitCode;
+(function (ExitCode) {
+    /**
+     * A code indicating that the action was successful
+     */
+    ExitCode[ExitCode["Success"] = 0] = "Success";
+    /**
+     * A code indicating that the action was a failure
+     */
+    ExitCode[ExitCode["Failure"] = 1] = "Failure";
+})(ExitCode || (ExitCode = {}));
+/**
+ * Gets the value of an input.
+ * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+ * Returns an empty string if the value is not defined.
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   string
+ */
+function getInput(name, options) {
+    const val = process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
+    if (options && options.required && !val) {
+        throw new Error(`Input required and not supplied: ${name}`);
+    }
+    if (options && options.trimWhitespace === false) {
+        return val;
+    }
+    return val.trim();
+}
+//-----------------------------------------------------------------------
+// Results
+//-----------------------------------------------------------------------
+/**
+ * Sets the action status to failed.
+ * When the action exits it will be with an exit code of 1
+ * @param message add error issue message
+ */
+function setFailed(message) {
+    process.exitCode = ExitCode.Failure;
+    error(message);
+}
+/**
+ * Adds an error issue
+ * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function error(message, properties = {}) {
+    issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+
+class Context {
+    /**
+     * Hydrate the context from the environment
+     */
+    constructor() {
+        var _a, _b, _c;
+        this.payload = {};
+        if (process.env.GITHUB_EVENT_PATH) {
+            if (existsSync(process.env.GITHUB_EVENT_PATH)) {
+                this.payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, { encoding: 'utf8' }));
+            }
+            else {
+                const path = process.env.GITHUB_EVENT_PATH;
+                process.stdout.write(`GITHUB_EVENT_PATH ${path} does not exist${EOL}`);
+            }
+        }
+        this.eventName = process.env.GITHUB_EVENT_NAME;
+        this.sha = process.env.GITHUB_SHA;
+        this.ref = process.env.GITHUB_REF;
+        this.workflow = process.env.GITHUB_WORKFLOW;
+        this.action = process.env.GITHUB_ACTION;
+        this.actor = process.env.GITHUB_ACTOR;
+        this.job = process.env.GITHUB_JOB;
+        this.runAttempt = parseInt(process.env.GITHUB_RUN_ATTEMPT, 10);
+        this.runNumber = parseInt(process.env.GITHUB_RUN_NUMBER, 10);
+        this.runId = parseInt(process.env.GITHUB_RUN_ID, 10);
+        this.apiUrl = (_a = process.env.GITHUB_API_URL) !== null && _a !== void 0 ? _a : `https://api.github.com`;
+        this.serverUrl = (_b = process.env.GITHUB_SERVER_URL) !== null && _b !== void 0 ? _b : `https://github.com`;
+        this.graphqlUrl =
+            (_c = process.env.GITHUB_GRAPHQL_URL) !== null && _c !== void 0 ? _c : `https://api.github.com/graphql`;
+    }
+    get issue() {
+        const payload = this.payload;
+        return Object.assign(Object.assign({}, this.repo), { number: (payload.issue || payload.pull_request || payload).number });
+    }
+    get repo() {
+        if (process.env.GITHUB_REPOSITORY) {
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            return { owner, repo };
+        }
+        if (this.payload.repository) {
+            return {
+                owner: this.payload.repository.owner.login,
+                repo: this.payload.repository.name
+            };
+        }
+        throw new Error("context.repo requires a GITHUB_REPOSITORY environment variable like 'owner/repo'");
+    }
+}
+
+var lib = {};
+
+var proxy = {};
+
+var hasRequiredProxy;
+
+function requireProxy () {
+	if (hasRequiredProxy) return proxy;
+	hasRequiredProxy = 1;
+	Object.defineProperty(proxy, "__esModule", { value: true });
+	proxy.getProxyUrl = getProxyUrl;
+	proxy.checkBypass = checkBypass;
+	function getProxyUrl(reqUrl) {
+	    const usingSsl = reqUrl.protocol === 'https:';
+	    if (checkBypass(reqUrl)) {
+	        return undefined;
+	    }
+	    const proxyVar = (() => {
+	        if (usingSsl) {
+	            return process.env['https_proxy'] || process.env['HTTPS_PROXY'];
+	        }
+	        else {
+	            return process.env['http_proxy'] || process.env['HTTP_PROXY'];
+	        }
+	    })();
+	    if (proxyVar) {
+	        try {
+	            return new DecodedURL(proxyVar);
+	        }
+	        catch (_a) {
+	            if (!proxyVar.startsWith('http://') && !proxyVar.startsWith('https://'))
+	                return new DecodedURL(`http://${proxyVar}`);
+	        }
+	    }
+	    else {
+	        return undefined;
+	    }
+	}
+	function checkBypass(reqUrl) {
+	    if (!reqUrl.hostname) {
+	        return false;
+	    }
+	    const reqHost = reqUrl.hostname;
+	    if (isLoopbackAddress(reqHost)) {
+	        return true;
+	    }
+	    const noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
+	    if (!noProxy) {
+	        return false;
+	    }
+	    // Determine the request port
+	    let reqPort;
+	    if (reqUrl.port) {
+	        reqPort = Number(reqUrl.port);
+	    }
+	    else if (reqUrl.protocol === 'http:') {
+	        reqPort = 80;
+	    }
+	    else if (reqUrl.protocol === 'https:') {
+	        reqPort = 443;
+	    }
+	    // Format the request hostname and hostname with port
+	    const upperReqHosts = [reqUrl.hostname.toUpperCase()];
+	    if (typeof reqPort === 'number') {
+	        upperReqHosts.push(`${upperReqHosts[0]}:${reqPort}`);
+	    }
+	    // Compare request host against noproxy
+	    for (const upperNoProxyItem of noProxy
+	        .split(',')
+	        .map(x => x.trim().toUpperCase())
+	        .filter(x => x)) {
+	        if (upperNoProxyItem === '*' ||
+	            upperReqHosts.some(x => x === upperNoProxyItem ||
+	                x.endsWith(`.${upperNoProxyItem}`) ||
+	                (upperNoProxyItem.startsWith('.') &&
+	                    x.endsWith(`${upperNoProxyItem}`)))) {
+	            return true;
+	        }
+	    }
+	    return false;
+	}
+	function isLoopbackAddress(host) {
+	    const hostLower = host.toLowerCase();
+	    return (hostLower === 'localhost' ||
+	        hostLower.startsWith('127.') ||
+	        hostLower.startsWith('[::1]') ||
+	        hostLower.startsWith('[0:0:0:0:0:0:0:1]'));
+	}
+	class DecodedURL extends URL {
+	    constructor(url, base) {
+	        super(url, base);
+	        this._decodedUsername = decodeURIComponent(super.username);
+	        this._decodedPassword = decodeURIComponent(super.password);
+	    }
+	    get username() {
+	        return this._decodedUsername;
+	    }
+	    get password() {
+	        return this._decodedPassword;
+	    }
+	}
+	
+	return proxy;
+}
+
 var hasRequiredLib;
 
 function requireLib () {
@@ -27970,8 +28315,8 @@ function requireLib () {
 	lib.HttpClient = lib.HttpClientResponse = lib.HttpClientError = lib.MediaTypes = lib.Headers = lib.HttpCodes = void 0;
 	lib.getProxyUrl = getProxyUrl;
 	lib.isHttps = isHttps;
-	const http = __importStar(require$$2);
-	const https = __importStar(require$$3);
+	const http$1 = __importStar(http);
+	const https$1 = __importStar(https);
 	const pm = __importStar(requireProxy());
 	const tunnel = __importStar(requireTunnel());
 	const undici_1 = requireUndici();
@@ -28396,7 +28741,7 @@ function requireLib () {
 	        const info = {};
 	        info.parsedUrl = requestUrl;
 	        const usingSsl = info.parsedUrl.protocol === 'https:';
-	        info.httpModule = usingSsl ? https : http;
+	        info.httpModule = usingSsl ? https$1 : http$1;
 	        const defaultPort = usingSsl ? 443 : 80;
 	        info.options = {};
 	        info.options.host = info.parsedUrl.hostname;
@@ -28510,7 +28855,7 @@ function requireLib () {
 	        const usingSsl = parsedUrl.protocol === 'https:';
 	        let maxSockets = 100;
 	        if (this.requestOptions) {
-	            maxSockets = this.requestOptions.maxSockets || http.globalAgent.maxSockets;
+	            maxSockets = this.requestOptions.maxSockets || http$1.globalAgent.maxSockets;
 	        }
 	        // This is `useProxy` again, but we need to check `proxyURl` directly for TypeScripts's flow analysis.
 	        if (proxyUrl && proxyUrl.hostname) {
@@ -28535,7 +28880,7 @@ function requireLib () {
 	        // if tunneling agent isn't assigned create a new agent
 	        if (!agent) {
 	            const options = { keepAlive: this._keepAlive, maxSockets };
-	            agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
+	            agent = usingSsl ? new https$1.Agent(options) : new http$1.Agent(options);
 	            this._agent = agent;
 	        }
 	        if (usingSsl && this._ignoreSslError) {
@@ -28664,8 +29009,6 @@ function requireLib () {
 
 var libExports = requireLib();
 
-var undiciExports = requireUndici();
-
 var __awaiter = (globalThis && globalThis.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -28675,6 +29018,15 @@ var __awaiter = (globalThis && globalThis.__awaiter) || function (thisArg, _argu
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+function getAuthString(token, options) {
+    if (!token && !options.auth) {
+        throw new Error('Parameter token or opts.auth is required');
+    }
+    else if (token && options.auth) {
+        throw new Error('Parameters token and opts.auth may not both be specified');
+    }
+    return typeof options.auth === 'string' ? options.auth : `token ${token}`;
+}
 function getProxyAgent(destinationUrl) {
     const hc = new libExports.HttpClient();
     return hc.getAgent(destinationUrl);
@@ -28692,6 +29044,19 @@ function getProxyFetch(destinationUrl) {
 }
 function getApiBaseUrl() {
     return process.env['GITHUB_API_URL'] || 'https://api.github.com';
+}
+function getUserAgentWithOrchestrationId(baseUserAgent) {
+    var _a;
+    const orchId = (_a = process.env['ACTIONS_ORCHESTRATION_ID']) === null || _a === void 0 ? void 0 : _a.trim();
+    if (orchId) {
+        const sanitizedId = orchId.replace(/[^a-z0-9_.-]/gi, '_');
+        const tag = `actions_orchestration_id/${sanitizedId}`;
+        if (baseUserAgent === null || baseUserAgent === void 0 ? void 0 : baseUserAgent.includes(tag))
+            return baseUserAgent;
+        const ua = baseUserAgent ? `${baseUserAgent} ` : '';
+        return `${ua}${tag}`;
+    }
+    return baseUserAgent;
 }
 
 function getUserAgent() {
@@ -32657,20 +33022,78 @@ const defaults = {
         fetch: getProxyFetch(baseUrl)
     }
 };
-Octokit.plugin(restEndpointMethods, paginateRest).defaults(defaults);
+const GitHub = Octokit.plugin(restEndpointMethods, paginateRest).defaults(defaults);
+/**
+ * Convience function to correctly format Octokit Options to pass into the constructor.
+ *
+ * @param     token    the repo PAT or GITHUB_TOKEN
+ * @param     options  other options to set
+ */
+function getOctokitOptions(token, options) {
+    const opts = Object.assign({}, {}); // Shallow clone - don't mutate the object provided by the caller
+    // Auth
+    const auth = getAuthString(token, opts);
+    if (auth) {
+        opts.auth = auth;
+    }
+    // Orchestration ID
+    const userAgent = getUserAgentWithOrchestrationId(opts.userAgent);
+    if (userAgent) {
+        opts.userAgent = userAgent;
+    }
+    return opts;
+}
 
 const context = new Context();
+/**
+ * Returns a hydrated octokit ready to use for GitHub Actions
+ *
+ * @param     token    the repo PAT or GITHUB_TOKEN
+ * @param     options  other options to set
+ */
+function getOctokit(token, options, ...additionalPlugins) {
+    const GitHubWithPlugins = GitHub.plugin(...additionalPlugins);
+    return new GitHubWithPlugins(getOctokitOptions(token));
+}
 
 async function run() {
     try {
         // Get issue number of the payload
         const issue_number = context.payload.issue?.number;
         if (!issue_number) {
+            setFailed("Issue number retrieval failed");
             return;
+        }
+        //github client to make requests
+        const octokit = getOctokit(getInput("repo-token", { required: true }));
+        //get issue body
+        const response = await octokit.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue_number,
+        });
+        const issue_body = response.data.body;
+        if (!issue_body) {
+            setFailed("Issue body retrieval failed");
+            return;
+        }
+        //modify issue body with round link id
+        const re = /(\[?Round ID\]?:\s*)(\d+)/g;
+        if (issue_body.match(re)) {
+            const new_body = issue_body.replace(re, "$1[$2](https://statbus.space/round/$2)");
+            await octokit.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                body: new_body,
+                headers: {
+                    "X-GitHub-Api-Version": "2026-03-10",
+                },
+            });
         }
     }
     catch (e) {
-        console.log(e);
+        setFailed(`Action failed ${e}.`);
     }
 }
 run();
