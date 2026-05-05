@@ -33086,6 +33086,9 @@ async function run() {
                 repo: context.repo.repo,
                 issue_number: issue_number,
                 body: new_body,
+                headers: {
+                    "X-GitHub-Api-Version": "2026-03-10"
+                }
             });
         }
     }
