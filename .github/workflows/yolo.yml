@@ -1,0 +1,10 @@
+name: "Round ID Linker"
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  link_rounds:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: ./
