@@ -33066,13 +33066,7 @@ async function run() {
         }
         //get issue body
         let issue_body = context.payload.issue?.body;
-        if (issue_body == undefined) {
-            setFailed('Issue body retrieval failed');
-            return;
-        }
-        //issue body was empty after trim
-        issue_body = issue_body.trim();
-        if (issue_body.length == 0) {
+        if (!issue_body) {
             return;
         }
         //modify issue body with round link id
