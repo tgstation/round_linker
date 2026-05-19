@@ -28087,6 +28087,27 @@ function getInput(name, options) {
     }
     return val.trim();
 }
+/**
+ * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+ * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+ * The return value is also in boolean type.
+ * ref: https://yaml.org/spec/1.2/spec.html#id2804923
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   boolean
+ */
+function getBooleanInput(name, options) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    const val = getInput(name, options);
+    if (trueValue.includes(val))
+        return true;
+    if (falseValue.includes(val))
+        return false;
+    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
 //-----------------------------------------------------------------------
 // Results
 //-----------------------------------------------------------------------
@@ -33078,15 +33099,17 @@ async function run() {
             changes = true;
         }
         //modify issue body with byond client download link
-        const ce = /(\[?Client Version\]?:\s*)((\d+)\.(\d+))/g;
-        if (issue_body.match(ce)) {
-            issue_body = issue_body.replace(ce, '$1' + //text Client Version
-                '$2=>' + //full client version
-                '[$3](https://www.byond.com/download/build/$3)/' + //major version download page
-                '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)/' + //windows zip file with installer
-                '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
-            );
-            changes = true;
+        if (getBooleanInput('format-version')) {
+            const ce = /(\[?Client Version\]?:\s*)((\d+)\.(\d+))/g;
+            if (issue_body.match(ce)) {
+                issue_body = issue_body.replace(ce, '$1' + //text Client Version
+                    '$2=>' + //full client version
+                    '[$3](https://www.byond.com/download/build/$3)/' + //major version download page
+                    '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)/' + //windows zip file with installer
+                    '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
+                );
+                changes = true;
+            }
         }
         //no changes
         if (!changes) {
