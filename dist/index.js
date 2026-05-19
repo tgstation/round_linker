@@ -33081,8 +33081,8 @@ async function run() {
         const ce = /(\[?Client Version\]?:\s*)((\d+)\.(\d+))/g;
         if (issue_body.match(ce)) {
             issue_body = issue_body.replace(ce, '$1' +
-                '$3=>' +
-                '[$3](https://www.byond.com/download/build/$3)/' +
+                '$2=>' +
+                '[$3](https://www.byond.com/download/build/$3)/' + //major version download page
                 '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)' + //windows zip file with installer
                 '/' +
                 '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
