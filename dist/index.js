@@ -33080,9 +33080,11 @@ async function run() {
         //modify issue body with byond client download link
         const ce = /(\[?Client Version\]?:\s*)((\d+)\.(\d+))/g;
         if (issue_body.match(ce)) {
-            issue_body = issue_body.replace(ce, '[$1](https://www.byond.com/download/build/$3):' +
+            issue_body = issue_body.replace(ce, '$1' +
+                '$3=>' +
+                '[$3](https://www.byond.com/download/build/$3)/' +
                 '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)' + //windows zip file with installer
-                ',' +
+                '/' +
                 '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
             );
             changes = true;

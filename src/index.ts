@@ -34,9 +34,11 @@ async function run(): Promise<void> {
         if (issue_body.match(ce)) {
             issue_body = issue_body.replace(
                 ce,
-                '[$1](https://www.byond.com/download/build/$3):' +
+                '$1' +
+                    '$3=>' +
+                    '[$3](https://www.byond.com/download/build/$3)/' +
                     '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)' + //windows zip file with installer
-                    ',' +
+                    '/' +
                     '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
             )
             changes = true
