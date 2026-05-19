@@ -33094,6 +33094,7 @@ async function run() {
         }
         //github client to make requests
         const octokit = getOctokit(getInput('repo-token', { required: true }));
+        //make request to update issue body
         await octokit.rest.issues.update({
             owner: context.repo.owner,
             repo: context.repo.repo,

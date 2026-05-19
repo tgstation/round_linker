@@ -53,6 +53,7 @@ async function run(): Promise<void> {
             getInput('repo-token', {required: true})
         )
 
+        //make request to update issue body
         await octokit.rest.issues.update({
             owner: context.repo.owner,
             repo: context.repo.repo,
