@@ -1,12 +1,52 @@
-import {getInput, setFailed} from '@actions/core'
+import {getInput, getBooleanInput, setFailed} from '@actions/core'
 import {getOctokit, context} from '@actions/github'
 
 async function run(): Promise<void> {
     try {
-        // Get issue number of the payload
+        //get issue number of the payload
         const issue_number = context.payload.issue?.number
-        if (!issue_number) {
+        if (issue_number == undefined) {
             setFailed('Issue number retrieval failed')
+            return
+        }
+
+        //get issue body
+        let issue_body = context.payload.issue?.body
+        if (!issue_body) {
+            return
+        }
+
+        //check for regex changes
+        let changes = false
+
+        //modify issue body with round link id
+        const re = /(\[?Round ID\]?:\s*)(\d+)/g
+        if (issue_body.match(re)) {
+            issue_body = issue_body.replace(
+                re,
+                '$1[$2](https://statbus.space/round/$2)'
+            )
+            changes = true
+        }
+
+        //modify issue body with byond client download link
+        if (getBooleanInput('format-version')) {
+            const ce = /(\[?Client Version\]?:\s*)((\d+)\.(\d+))/g
+            if (issue_body.match(ce)) {
+                issue_body = issue_body.replace(
+                    ce,
+                    '$1' + //text Client Version
+                        '$2=>' + //full client version
+                        '[$3](https://www.byond.com/download/build/$3)/' + //major version download page
+                        '[Windows](https://www.byond.com/download/build/$3/$2_byond_setup.zip)/' + //windows zip file with installer
+                        '[Linux](https://www.byond.com/download/build/$3/$2_byond_linux.zip)' //linux zip folder
+                )
+                changes = true
+            }
+        }
+
+        //no changes
+        if (!changes) {
             return
         }
 
@@ -15,36 +55,16 @@ async function run(): Promise<void> {
             getInput('repo-token', {required: true})
         )
 
-        //get issue body
-        const response = await octokit.rest.issues.get({
+        //make request to update issue body
+        await octokit.rest.issues.update({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: issue_number
+            issue_number: issue_number,
+            body: issue_body,
+            headers: {
+                'X-GitHub-Api-Version': '2026-03-10'
+            }
         })
-        const issue_body = response.data.body
-        if (!issue_body) {
-            setFailed('Issue body retrieval failed')
-            return
-        }
-
-        //modify issue body with round link id
-        const re = /(\[?Round ID\]?:\s*)(\d+)/g
-        if (issue_body.match(re)) {
-            const new_body = issue_body.replace(
-                re,
-                '$1[$2](https://statbus.space/round/$2)'
-            )
-
-            await octokit.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue_number,
-                body: new_body,
-                headers: {
-                    'X-GitHub-Api-Version': '2026-03-10'
-                }
-            })
-        }
     } catch (e) {
         setFailed(`Action failed ${e}.`)
     }

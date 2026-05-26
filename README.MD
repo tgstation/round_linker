@@ -1,9 +1,17 @@
 # Round ID Linker
 
 Replaces round id's in issue body with links to statbus.
-Accepted round id format :
+Accepted round id formats :
 ```
 [Round ID]: 1245
+Round ID: 1245
+```
+
+Also replaces Byond client version with their respective download links to both windows & linux
+Accepted client id format :
+```
+[Client Version]: 516.1681
+Client Version: 516.1681
 ```
 
 ## Usage
